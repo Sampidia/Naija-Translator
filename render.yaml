@@ -1,0 +1,38 @@
+services:
+  # API Service
+  - type: web
+    name: naija-translator-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: AUDIO_BACKEND
+        value: supabase
+      - key: USE_REAL_MODELS
+        value: "true"
+      - key: REQUIRE_API_KEY
+        value: "true"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: PORT
+        value: 10000
+
+  # Background Worker (comment out if not using Redis yet)
+  # - type: worker
+  #   name: naija-translator-worker
+  #   env: python
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: python -m app.worker
+  #   envVars:
+  #     - key: USE_REDIS_JOBS
+  #       value: "true"
+  #     - key: REDIS_URL
+  #       fromService:
+  #         type: redis
+  #         name: naija-translator-redis
+  #         property: connectionString
+
+  # Redis (comment out if not using worker yet)
+  # - type: redis
+  #   name: naija-translator-redis
+  #   ipAllowList: [] # Only allow internal connections
