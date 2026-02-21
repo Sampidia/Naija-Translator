@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 from app.config import settings
@@ -13,7 +14,9 @@ def evaluate_readiness() -> ReadinessReport:
     checks: dict[str, str] = {}
 
     checks["audio_backend"] = _check_audio_backend()
-    checks["real_models"] = _check_real_model_dependencies()
+    checks["real_models_enabled"] = "true" if settings.use_real_models else "false"
+    checks["hf_token_set"] = "true" if os.getenv("HF_TOKEN") else "false"
+    checks["real_models_deps"] = _check_real_model_dependencies()
 
     ready = all(status == "ok" for status in checks.values())
     return ReadinessReport(ready=ready, checks=checks)
