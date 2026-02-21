@@ -105,4 +105,20 @@ Yes—you can avoid AWS S3 initially.
 - Keep `AUDIO_BACKEND=s3` and point `S3_ENDPOINT_URL` to your chosen S3-compatible provider.
 - If using Supabase directly, set `AUDIO_BACKEND=supabase` and provide Supabase credentials.
 
+## Deployment target (recommended for this project)
+- **Frontend**: deploy to **Vercel** (best fit for Next.js/React UI hosting).
+- **Backend API + background workers**: deploy FastAPI and job workers to a container host (Render, Railway, Fly.io, or VPS/Docker).
+- **Audio artifacts**: keep using **Supabase Storage** for generated audio and signed download/play URLs.
+
+This split keeps Vercel for frontend delivery while running ASR/TTS inference and queue processing on compute better suited for Python/ML workloads.
+
+## Frontend readiness
+- This repository currently contains a **backend scaffold only** (FastAPI routes, async jobs, storage adapters, tests).
+- A production frontend UI is **not built yet** in this codebase.
+- Recommended next UI milestone: implement a Next.js app with:
+  - text translation inputs (`en <-> yo`),
+  - Yoruba speech upload/record,
+  - audio playback and download controls,
+  - job status polling for async TTS/speech jobs.
+
 > Note: inference providers are placeholders currently; this scaffold focuses on production-ready API and storage wiring.
