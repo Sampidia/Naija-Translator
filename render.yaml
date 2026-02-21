@@ -1,8 +1,10 @@
 services:
-  # API Service
+  # API Service (Free Tier compatible)
   - type: web
     name: naija-translator-api
     env: python
+    # For Free Tier, we use 'plan: free' explicitly if needed, but usually the UI handles it.
+    # We remove the Worker and Redis as they are paid on Render unless using external free providers.
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -14,25 +16,5 @@ services:
         value: "true"
       - key: RATE_LIMIT_PER_MINUTE
         value: "60"
-      - key: PORT
-        value: 10000
-
-  # Background Worker (comment out if not using Redis yet)
-  # - type: worker
-  #   name: naija-translator-worker
-  #   env: python
-  #   buildCommand: pip install -r requirements.txt
-  #   startCommand: python -m app.worker
-  #   envVars:
-  #     - key: USE_REDIS_JOBS
-  #       value: "true"
-  #     - key: REDIS_URL
-  #       fromService:
-  #         type: redis
-  #         name: naija-translator-redis
-  #         property: connectionString
-
-  # Redis (comment out if not using worker yet)
-  # - type: redis
-  #   name: naija-translator-redis
-  #   ipAllowList: [] # Only allow internal connections
+      - key: USE_REDIS_JOBS
+        value: "false" # Redis is not free on Render
