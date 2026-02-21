@@ -26,7 +26,7 @@ PYTHONPATH=. pytest -q
 
 ## Health endpoints
 - `GET /health/live`
-- `GET /health/ready`
+- `GET /health/ready` (returns 503 with failing `checks` when backend/model prerequisites are missing)
 
 ## Security controls
 - Optional API key auth via `REQUIRE_API_KEY=true` and `API_KEY`.

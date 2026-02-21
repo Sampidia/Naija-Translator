@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from app.models.errors import InferenceError, StorageError
@@ -13,6 +13,7 @@ from app.schemas import (
     TranslateResponse,
 )
 from app.services.runtime import asr, audio_store, english_tts, jobs, translator, yoruba_tts
+from app.services.readiness import evaluate_readiness
 from app.services.security import enforce_rate_limit, require_api_key
 
 app = FastAPI(title="Naija Translator API", version="0.2.0")
@@ -34,8 +35,12 @@ def health_live() -> dict[str, str]:
 
 
 @app.get("/health/ready")
-def health_ready() -> dict[str, str]:
-    return {"status": "ready"}
+def health_ready(response: Response) -> dict[str, str | dict[str, str]]:
+    report = evaluate_readiness()
+    if not report.ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "not_ready", "checks": report.checks}
+    return {"status": "ready", "checks": report.checks}
 
 
 @app.post("/api/v1/translate", response_model=TranslateResponse)
