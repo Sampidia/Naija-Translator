@@ -131,3 +131,22 @@ This split keeps Vercel for frontend delivery while running ASR/TTS inference an
 - Next UI milestone: move this MVP into a dedicated Next.js frontend for Vercel deployment and stronger UX/accessibility.
 
 > Note: inference providers are placeholders currently; this scaffold focuses on production-ready API and storage wiring.
+
+## What’s next (execution order)
+1. **Run real models in staging** (`USE_REAL_MODELS=true`) and verify quality/latency for:
+   - `NCAIR1/Yoruba-ASR`
+   - `NCAIR1/NigerianAccentedEnglish`
+   - `Workhelio/yoruba_tts`
+2. **Harden job execution** by replacing in-process `ThreadPoolExecutor` with a durable queue worker (Celery/RQ + Redis) so jobs survive restarts.
+3. **Split deployment for production**:
+   - Vercel for frontend
+   - container host for FastAPI API + workers
+   - Supabase Storage for generated audio
+4. **Production security**:
+   - set `REQUIRE_API_KEY=true`
+   - set strong `API_KEY`
+   - tune `RATE_LIMIT_PER_MINUTE`
+5. **Release gate**:
+   - require CI green (`compileall` + `pytest`)
+   - run staged E2E checks for translate -> TTS -> stream/download.
+
