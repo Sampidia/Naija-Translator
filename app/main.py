@@ -57,14 +57,12 @@ def tts(
     _api: None = Depends(require_api_key),
     _rate: None = Depends(enforce_rate_limit),
 ) -> JobResponse:
-    provider = yoruba_tts if payload.lang == "yo" else english_tts
     job_id = jobs.create()
-
-    def work():
-        wav, rate = provider.synthesize(payload.text, payload.lang, payload.voice)
-        return audio_store.save_wav(wav, rate)
-
-    jobs.enqueue(job_id, work)
+    jobs.enqueue_task(
+        job_id,
+        "tts",
+        {"text": payload.text, "lang": payload.lang, "voice": payload.voice},
+    )
     return JobResponse(job_id=job_id, status="queued")
 
 
@@ -103,12 +101,7 @@ def speech_translate(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     job_id = jobs.create()
-
-    def work():
-        wav, rate = english_tts.synthesize(translated.text, lang="en")
-        return audio_store.save_wav(wav, rate)
-
-    jobs.enqueue(job_id, work)
+    jobs.enqueue_task(job_id, "english_tts", {"text": translated.text})
 
     return SpeechTranslateResponse(
         transcript_yo=transcript,

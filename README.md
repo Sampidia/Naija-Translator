@@ -61,6 +61,20 @@ When enabled, translation/ASR call Hugging Face pipelines and TTS uses `text-to-
 
 Copy `.env.example` to `.env` and set values for your backend.
 
+## Worker (durable queue mode)
+When `USE_REDIS_JOBS=true`, API nodes enqueue job payloads to Redis and a separate worker process executes them.
+
+Run the worker:
+```bash
+USE_REDIS_JOBS=true REDIS_URL=redis://localhost:6379/0 python -m app.worker
+```
+
+## Real-model staging validator
+Use this smoke script before production rollout:
+```bash
+USE_REAL_MODELS=true python scripts/validate_real_models.py
+```
+
 ## Audio storage backends
 Default backend is local disk.
 
