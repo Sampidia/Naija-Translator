@@ -21,3 +21,5 @@ services:
         value: "60"
       - key: USE_REDIS_JOBS
         value: "false" # Redis is not free on Render
+      - key: HF_TOKEN # Add your Hugging Face token in Render Dashboard
+        value: ""
