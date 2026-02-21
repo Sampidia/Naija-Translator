@@ -38,6 +38,11 @@ GitHub Actions runs compile checks and the full test suite on every push and pul
 - Optional API key auth via `REQUIRE_API_KEY=true` and `API_KEY`.
 - In-memory per-client rate limiting via `RATE_LIMIT_PER_MINUTE` (default 60).
 
+## Do you need a FastAPI API key?
+- **For local development/testing:** No. Keep `REQUIRE_API_KEY=false`.
+- **For staging/production (recommended):** Yes. Set `REQUIRE_API_KEY=true` and a strong `API_KEY`, then send it as `x-api-key` on protected endpoints.
+- Health endpoints (`/health/live`, `/health/ready`) remain unauthenticated for platform probes.
+
 ## Job backend
 - Default in-process async workers.
 - Optional Redis-backed job status persistence with `USE_REDIS_JOBS=true` and `REDIS_URL`.
