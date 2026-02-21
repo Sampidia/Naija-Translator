@@ -2,6 +2,7 @@ services:
   # API Service (Free Tier compatible)
   - type: web
     name: naija-translator-api
+    plan: free # Explicitly use the free tier to avoid payment info requests
     env: python
     # For Free Tier, we use 'plan: free' explicitly if needed, but usually the UI handles it.
     # We remove the Worker and Redis as they are paid on Render unless using external free providers.
