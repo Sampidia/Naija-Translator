@@ -10,7 +10,7 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11" # Pin to a stable version to avoid Python 3.14 build issues
+        value: "3.11.11" # Render requires major.minor.patch
       - key: AUDIO_BACKEND
         value: supabase
       - key: USE_REAL_MODELS
