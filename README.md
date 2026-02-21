@@ -24,6 +24,12 @@ pip install -r requirements.txt
 PYTHONPATH=. pytest -q
 ```
 
+## CI
+
+GitHub Actions runs compile checks and the full test suite on every push and pull request:
+- Workflow: `.github/workflows/ci.yml`
+- Steps: install dependencies, `python -m compileall app tests`, `PYTHONPATH=. pytest -q`
+
 ## Health endpoints
 - `GET /health/live`
 - `GET /health/ready` (returns 503 with failing `checks` when backend/model prerequisites are missing)
