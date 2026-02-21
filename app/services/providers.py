@@ -41,7 +41,11 @@ class SimpleTranslator(TextTranslator):
         from transformers import pipeline
 
         token = os.getenv("HF_TOKEN")
-        self._pipelines[key] = pipeline("translation", model=model_id, token=token)
+        kwargs = {"model": model_id}
+        if token and token.strip():
+            kwargs["token"] = token.strip()
+        
+        self._pipelines[key] = pipeline("translation", **kwargs)
         return self._pipelines[key]
 
 
@@ -58,7 +62,10 @@ class YorubaASRProvider(SpeechToText):
                     from transformers import pipeline
 
                     token = os.getenv("HF_TOKEN")
-                    self._pipe = pipeline("automatic-speech-recognition", model=self.model_id, token=token)
+                    kwargs = {"model": self.model_id}
+                    if token and token.strip():
+                        kwargs["token"] = token.strip()
+                    self._pipe = pipeline("automatic-speech-recognition", **kwargs)
                 result = self._pipe(audio_bytes)
                 text = result["text"] if isinstance(result, dict) else str(result)
                 return text, self.model_id
@@ -88,7 +95,10 @@ class _HFTextToAudioProvider(TextToSpeech):
             from transformers import pipeline
 
             token = os.getenv("HF_TOKEN")
-            self._pipe = pipeline("text-to-audio", model=self.model_id, token=token)
+            kwargs = {"model": self.model_id}
+            if token and token.strip():
+                kwargs["token"] = token.strip()
+            self._pipe = pipeline("text-to-audio", **kwargs)
 
         result = self._pipe(text)
         if isinstance(result, dict) and "audio" in result and "sampling_rate" in result:
