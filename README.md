@@ -117,13 +117,17 @@ Yes—you can avoid AWS S3 initially.
 
 This split keeps Vercel for frontend delivery while running ASR/TTS inference and queue processing on compute better suited for Python/ML workloads.
 
+## Implementation process (all steps)
+1. **Backend API foundation** (done): translation, TTS jobs, speech->English, playback/download endpoints.
+2. **Storage + environment hardening** (done): local/S3/Supabase backends, readiness checks, CI test workflow.
+3. **Frontend MVP** (done in-repo): browser UI at `/` for translate, TTS generation, speech upload, playback/download.
+4. **Security baseline** (done): optional API key + rate limiting.
+5. **Production model rollout** (next): run with `USE_REAL_MODELS=true`, validate quality/latency, tune model IDs.
+6. **Durable worker rollout** (next): move from in-process executor to dedicated queue workers for restart-safe processing.
+
 ## Frontend readiness
-- This repository currently contains a **backend scaffold only** (FastAPI routes, async jobs, storage adapters, tests).
-- A production frontend UI is **not built yet** in this codebase.
-- Recommended next UI milestone: implement a Next.js app with:
-  - text translation inputs (`en <-> yo`),
-  - Yoruba speech upload/record,
-  - audio playback and download controls,
-  - job status polling for async TTS/speech jobs.
+- A lightweight in-repo frontend MVP is now available at `/` (`app/static/index.html`).
+- It supports text translation, TTS generation with polling, Yoruba speech upload, playback, and download links.
+- Next UI milestone: move this MVP into a dedicated Next.js frontend for Vercel deployment and stronger UX/accessibility.
 
 > Note: inference providers are placeholders currently; this scaffold focuses on production-ready API and storage wiring.

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Naija Translator</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+      .card { border: 1px solid #ddd; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+      label { display: block; margin: 0.5rem 0 0.25rem; font-weight: 600; }
+      input, textarea, select, button { width: 100%; padding: 0.6rem; margin-bottom: 0.6rem; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+      .muted { color: #555; font-size: 0.9rem; }
+      audio { width: 100%; margin-top: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Naija Translator UI (MVP)</h1>
+    <p class="muted">This frontend uses existing FastAPI endpoints for translation, TTS, and speech translation.</p>
+
+    <section class="card">
+      <h2>1) Text Translation</h2>
+      <label for="translateText">Text</label>
+      <textarea id="translateText" rows="3" placeholder="Type text..."></textarea>
+      <div class="row">
+        <div>
+          <label for="sourceLang">Source</label>
+          <select id="sourceLang"><option value="en">English</option><option value="yo">Yoruba</option></select>
+        </div>
+        <div>
+          <label for="targetLang">Target</label>
+          <select id="targetLang"><option value="yo">Yoruba</option><option value="en">English</option></select>
+        </div>
+      </div>
+      <button id="translateBtn">Translate</button>
+      <label>Translated output</label>
+      <textarea id="translatedOut" rows="3" readonly></textarea>
+    </section>
+
+    <section class="card">
+      <h2>2) Text to Speech (play + download)</h2>
+      <label for="ttsText">Text</label>
+      <textarea id="ttsText" rows="3" placeholder="Type text for speech..."></textarea>
+      <label for="ttsLang">Language</label>
+      <select id="ttsLang"><option value="en">English</option><option value="yo">Yoruba</option></select>
+      <button id="ttsBtn">Generate Audio</button>
+      <p id="ttsStatus" class="muted"></p>
+      <audio id="ttsAudio" controls></audio>
+      <p><a id="downloadLink" href="#" download style="display:none;">Download generated audio</a></p>
+    </section>
+
+    <section class="card">
+      <h2>3) Yoruba Speech → English + Audio</h2>
+      <label for="speechFile">Audio file</label>
+      <input id="speechFile" type="file" accept="audio/*" />
+      <button id="speechBtn">Upload + Translate</button>
+      <p class="muted" id="speechTextOut"></p>
+      <p id="speechTtsStatus" class="muted"></p>
+      <audio id="speechAudio" controls></audio>
+    </section>
+
+    <script>
+      async function fetchJson(url, options) {
+        const res = await fetch(url, options);
+        if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+        return res.json();
+      }
+
+      async function waitForAudio(jobId, statusEl) {
+        for (let i = 0; i < 120; i++) {
+          const status = await fetchJson(`/api/v1/tts/${jobId}`);
+          statusEl.textContent = `Job status: ${status.status}`;
+          if (status.status === 'ready') return status;
+          await new Promise(r => setTimeout(r, 500));
+        }
+        throw new Error('Timeout waiting for TTS job to complete');
+      }
+
+      document.getElementById('translateBtn').onclick = async () => {
+        const text = document.getElementById('translateText').value;
+        const source_lang = document.getElementById('sourceLang').value;
+        const target_lang = document.getElementById('targetLang').value;
+        const out = document.getElementById('translatedOut');
+        out.value = 'Translating...';
+        try {
+          const data = await fetchJson('/api/v1/translate', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text, source_lang, target_lang })
+          });
+          out.value = data.translated_text;
+        } catch (e) {
+          out.value = `Error: ${e.message}`;
+        }
+      };
+
+      document.getElementById('ttsBtn').onclick = async () => {
+        const text = document.getElementById('ttsText').value;
+        const lang = document.getElementById('ttsLang').value;
+        const statusEl = document.getElementById('ttsStatus');
+        const audioEl = document.getElementById('ttsAudio');
+        const download = document.getElementById('downloadLink');
+        statusEl.textContent = 'Submitting job...';
+        try {
+          const job = await fetchJson('/api/v1/tts', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text, lang, voice: 'default' })
+          });
+          const ready = await waitForAudio(job.job_id, statusEl);
+          audioEl.src = ready.play_url;
+          download.href = ready.download_url;
+          download.style.display = 'inline';
+        } catch (e) {
+          statusEl.textContent = `Error: ${e.message}`;
+        }
+      };
+
+      document.getElementById('speechBtn').onclick = async () => {
+        const file = document.getElementById('speechFile').files[0];
+        const out = document.getElementById('speechTextOut');
+        const statusEl = document.getElementById('speechTtsStatus');
+        const audioEl = document.getElementById('speechAudio');
+        if (!file) {
+          out.textContent = 'Please select an audio file.';
+          return;
+        }
+        out.textContent = 'Uploading...';
+        const form = new FormData();
+        form.append('audio_file', file);
+        try {
+          const data = await fetchJson('/api/v1/speech/translate', { method: 'POST', body: form });
+          out.textContent = `Transcript: ${data.transcript_yo} | EN: ${data.translated_text_en}`;
+          const ready = await waitForAudio(data.tts_job_id, statusEl);
+          audioEl.src = ready.play_url;
+        } catch (e) {
+          out.textContent = `Error: ${e.message}`;
+        }
+      };
+    </script>
+  </body>
+</html>

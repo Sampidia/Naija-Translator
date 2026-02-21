@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile, status
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from app.models.errors import InferenceError, StorageError
 from app.schemas import (
@@ -19,14 +19,9 @@ from app.services.security import enforce_rate_limit, require_api_key
 app = FastAPI(title="Naija Translator API", version="0.2.0")
 
 
-@app.get("/", response_class=HTMLResponse)
-def index() -> str:
-    return """
-    <html><body>
-      <h2>Naija Translator API</h2>
-      <p>Use /docs for API playground.</p>
-    </body></html>
-    """
+@app.get("/", response_class=FileResponse)
+def index() -> FileResponse:
+    return FileResponse(Path(__file__).parent / "static" / "index.html")
 
 
 @app.get("/health/live")
