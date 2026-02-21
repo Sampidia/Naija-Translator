@@ -113,7 +113,7 @@ def speech_translate(
     )
 
 
-@app.get("/api/v1/audio/{audio_id}")
+@app.get("/api/v1/audio/{audio_id}", response_model=None)
 def audio_stream(audio_id: str) -> FileResponse | RedirectResponse:
     try:
         location = audio_store.get(audio_id)
@@ -129,7 +129,7 @@ def audio_stream(audio_id: str) -> FileResponse | RedirectResponse:
     return FileResponse(path, media_type="audio/wav")
 
 
-@app.get("/api/v1/audio/{audio_id}/download")
+@app.get("/api/v1/audio/{audio_id}/download", response_model=None)
 def audio_download(audio_id: str) -> FileResponse | RedirectResponse:
     try:
         location = audio_store.get(audio_id)
