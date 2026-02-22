@@ -19,6 +19,12 @@ from app.models.errors import InferenceError
 
 HF_API_BASE = "https://api-inference.huggingface.co/models"
 
+# NLLB language codes (the model requires these specific codes)
+NLLB_LANG_MAP = {
+    "en": "eng_Latn",
+    "yo": "yor_Latn",
+}
+
 
 def _hf_headers() -> dict[str, str]:
     token = os.getenv("HF_TOKEN", "").strip()
@@ -32,27 +38,38 @@ def _hf_headers() -> dict[str, str]:
 
 class SimpleTranslator(TextTranslator):
     def __init__(self) -> None:
-        self.model_ids = {
-            ("en", "yo"): settings.en_yo_model_id,
-            ("yo", "en"): settings.yo_en_model_id,
-        }
+        # Use a single multilingual model for both directions
+        self.model_id = settings.en_yo_model_id  # nllb-200-distilled-600M
+        self.yo_en_model_id = settings.yo_en_model_id
 
     def translate(self, text: str, source_lang: str, target_lang: str) -> TranslationResult:
-        model_id = self.model_ids.get((source_lang, target_lang), "demo/unsupported")
         if source_lang == target_lang:
-            return TranslationResult(text=text, model_id=model_id)
+            return TranslationResult(text=text, model_id=self.model_id)
 
         if settings.use_real_models:
             try:
+                # Choose model: use the multilingual NLLB model 
+                model_id = self.model_id
+                src_code = NLLB_LANG_MAP.get(source_lang, source_lang)
+                tgt_code = NLLB_LANG_MAP.get(target_lang, target_lang)
+
                 url = f"{HF_API_BASE}/{model_id}"
-                payload = {"inputs": text}
-                resp = http_requests.post(url, json=payload, headers=_hf_headers(), timeout=30)
+                payload = {
+                    "inputs": text,
+                    "parameters": {
+                        "src_lang": src_code,
+                        "tgt_lang": tgt_code,
+                    }
+                }
+                resp = http_requests.post(url, json=payload, headers=_hf_headers(), timeout=60)
                 resp.raise_for_status()
                 data = resp.json()
 
                 # HF translation returns [{"translation_text": "..."}]
                 if isinstance(data, list) and data:
                     translated = data[0].get("translation_text", text)
+                elif isinstance(data, dict) and "translation_text" in data:
+                    translated = data["translation_text"]
                 else:
                     translated = str(data)
 
@@ -61,7 +78,7 @@ class SimpleTranslator(TextTranslator):
                 raise InferenceError(f"translation failed ({model_id}): {exc}") from exc
 
         translated = f"[YO] {text}" if (source_lang, target_lang) == ("en", "yo") else f"[EN] {text}"
-        return TranslationResult(text=translated, model_id=model_id)
+        return TranslationResult(text=translated, model_id=self.model_id)
 
 
 # ---------- ASR ---------- #
