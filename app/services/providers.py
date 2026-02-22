@@ -36,6 +36,8 @@ HF_API_BASE = "https://router.huggingface.co/hf-inference/models"
 MADLAD_LANG_MAP = {
     "en": "en",
     "yo": "yo",
+    "ig": "ig",
+    "ha": "ha",
 }
 
 

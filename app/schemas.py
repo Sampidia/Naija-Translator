@@ -3,8 +3,8 @@ from pydantic import BaseModel, Field
 
 class TranslateRequest(BaseModel):
     text: str = Field(min_length=1, max_length=500)
-    source_lang: str = Field(pattern="^(en|yo)$")
-    target_lang: str = Field(pattern="^(en|yo)$")
+    source_lang: str = Field(pattern="^(en|yo|ig|ha)$")
+    target_lang: str = Field(pattern="^(en|yo|ig|ha)$")
 
 
 class TranslateResponse(BaseModel):
@@ -14,7 +14,7 @@ class TranslateResponse(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=500)
-    lang: str = Field(pattern="^(en|yo)$")
+    lang: str = Field(pattern="^(en|yo|ig|ha)$")
     voice: str = "default"
 
 
