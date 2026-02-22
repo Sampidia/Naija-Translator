@@ -137,20 +137,30 @@ class GoogleTTSProvider(TextToSpeech):
     def list_voices(self) -> list[dict]:
         client = self._get_client()
         if not client:
+            print("DEBUG: list_voices called but client is None")
             return []
-        try:
-            response = client.list_voices(language_code=self.language_code)
-            voices = []
-            for voice in response.voices:
-                voices.append({
-                    "name": voice.name,
-                    "ssml_gender": str(voice.ssml_gender),
-                    "language_codes": list(voice.language_codes)
-                })
-            return voices
-        except Exception as e:
-            print(f"Error listing voices: {e}")
-            return []
+        
+        codes_to_try = [self.language_code, self.language_code[:2]]
+        for code in codes_to_try:
+            try:
+                print(f"DEBUG: Listing voices for {code}...")
+                response = client.list_voices(language_code=code)
+                if not response.voices:
+                    print(f"DEBUG: No voices found for {code}")
+                    continue
+                
+                voices = []
+                for voice in response.voices:
+                    voices.append({
+                        "name": voice.name,
+                        "ssml_gender": str(voice.ssml_gender),
+                        "language_codes": list(voice.language_codes)
+                    })
+                print(f"DEBUG: Found {len(voices)} voices for {code}")
+                return voices
+            except Exception as e:
+                print(f"DEBUG: Error listing voices for {code}: {e}")
+        return []
 
     def _get_client(self):
         if self._client:

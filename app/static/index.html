@@ -111,9 +111,12 @@
   <h1>Naija Translator UI (MVP)</h1>
   <p class="muted">This frontend uses existing FastAPI endpoints for translation, TTS, and speech translation.</p>
 
-  <div class="card" style="background: #f9f9f9;">
-    <label for="apiKey">API Key (if REQUIRE_API_KEY=true)</label>
-    <input id="apiKey" type="password" placeholder="Enter API Key... (Voices will load here)" />
+  <div class="card" style="background: #fdf2f2; border: 2px solid #d32f2f;">
+    <label for="apiKey">Step 1: Enter App API Key</label>
+    <p class="muted">Enter your API key to enable voice selection and translation services.</p>
+    <input id="apiKey" type="password" placeholder="Paste API Key here..." oninput="loadAllVoices()" />
+    <button onclick="loadAllVoices()" class="btn-outline" style="width: auto; padding: 0.4rem 1rem;">🔄 Refresh
+      Voices</button>
   </div>
 
   <section class="card">
@@ -138,7 +141,7 @@
     </div>
     <label for="translateVoice">Voice for Listen (Optional)</label>
     <select id="translateVoice">
-      <option value="default">Default (Auto)</option>
+      <option value="default">Default (Auto) - Enter API Key to load more</option>
     </select>
     <button id="translateBtn">Translate</button>
     <p id="translateStatus" class="muted"></p>
@@ -166,7 +169,7 @@
     </select>
     <label for="ttsVoice">Voice (Optional)</label>
     <select id="ttsVoice">
-      <option value="default">Default (Auto)</option>
+      <option value="default">Default (Auto) - Enter API Key to load more</option>
     </select>
     <button id="ttsBtn">Generate Audio</button>
     <p id="ttsStatus" class="muted"></p>
@@ -193,7 +196,7 @@
 
     <label for="speechVoice">Voice for Audio (Optional)</label>
     <select id="speechVoice">
-      <option value="default">Default (Auto)</option>
+      <option value="default">Default (Auto) - Enter API Key to load more</option>
     </select>
     <button id="speechBtn">Translate Speech</button>
     <p class="muted" id="speechTextOut"></p>
@@ -230,10 +233,18 @@
 
     async function loadVoices(lang, selectId) {
       const select = document.getElementById(selectId);
+      const originalFirst = select.options[0].textContent;
+      select.options[0].textContent = "⌛ Loading voices...";
+
       try {
         const data = await fetchJson(`/api/v1/voices?lang=${lang}`);
         // Clear except first (Default)
         while (select.options.length > 1) select.remove(1);
+
+        if (!data.voices || data.voices.length === 0) {
+          select.options[0].textContent = "Default (Auto) - No other voices found";
+          return;
+        }
 
         data.voices.forEach(v => {
           const opt = document.createElement('option');
@@ -241,8 +252,10 @@
           opt.textContent = `${v.name} (${v.ssml_gender})`;
           select.appendChild(opt);
         });
+        select.options[0].textContent = "Default (Auto)";
       } catch (e) {
         console.error("Failed to load voices:", e);
+        select.options[0].textContent = `Default (Auto) - Error: ${e.message.split(' ')[0]}`;
       }
     }
 
