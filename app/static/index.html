@@ -264,8 +264,9 @@
         });
         const ready = await waitForAudio(job.job_id, statusEl);
         audioEl.src = ready.play_url;
+        audioEl.play().catch(e => console.log("Autoplay blocked:", e));
         download.href = ready.download_url;
-        statusEl.textContent = 'Speech ready.';
+        statusEl.textContent = 'Audio ready.';
       } catch (e) {
         statusEl.textContent = `Speech error: ${e.message}`;
       }
@@ -285,8 +286,10 @@
         });
         const ready = await waitForAudio(job.job_id, statusEl);
         audioEl.src = ready.play_url;
+        audioEl.play().catch(e => console.log("Autoplay blocked:", e));
         download.href = ready.download_url;
         download.style.display = 'inline';
+        statusEl.textContent = 'Audio ready.';
       } catch (e) {
         statusEl.textContent = `Error: ${e.message}`;
       }
@@ -360,10 +363,14 @@
       try {
         const data = await fetchJson('/api/v1/speech/translate', { method: 'POST', body: form });
         out.textContent = `Transcript: ${data.transcript_yo} | EN: ${data.translated_text_en}`;
+        statusEl.textContent = 'Speech transcription ready. Generating audio...';
         const ready = await waitForAudio(data.tts_job_id, statusEl);
         audioEl.src = ready.play_url;
+        audioEl.play().catch(e => console.log("Autoplay blocked:", e));
+        statusEl.textContent = 'Audio ready.';
       } catch (e) {
         out.textContent = `Error: ${e.message}`;
+        statusEl.textContent = 'Processing failed.';
       }
     };
   </script>

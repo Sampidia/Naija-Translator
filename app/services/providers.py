@@ -157,6 +157,7 @@ class GoogleTTSProvider(TextToSpeech):
         client = self._get_client()
         if client:
             try:
+                print(f"DEBUG: Generating Google TTS for '{text[:20]}...' in {self.language_code}")
                 s_input = texttospeech.SynthesisInput(text=text)
                 v_params = texttospeech.VoiceSelectionParams(
                     language_code=self.language_code,
@@ -169,13 +170,19 @@ class GoogleTTSProvider(TextToSpeech):
                 response = client.synthesize_speech(
                     input=s_input, voice=v_params, audio_config=a_config
                 )
-                # Google returns WAV bytes with header for LINEAR16 usually, 
-                # but we should check if we need to wrap it. Actually synthesize_speech 
-                # returns the full audio file content.
-                return response.audio_content, 24000 # Google's default for many voices
+                
+                # Google LINEAR16 returns raw PCM bytes. We MUST wrap it in a WAV header
+                # so the browser player can recognize it.
+                sample_rate = 24000
+                wav_bytes = _audio_to_wav_bytes(response.audio_content, sample_rate)
+                
+                print(f"DEBUG: Successfully generated {len(wav_bytes)} bytes of audio")
+                return wav_bytes, sample_rate
             except Exception as e:
-                print(f"Google TTS synthesis failed: {e}")
-                # Fallback to tone
+                print(f"ERROR: Google TTS synthesis failed: {e}")
+                # Fallback to tone below
+        else:
+            print("WARNING: Google TTS client not initialized (check credentials JSON)")
         
         return _tone_from_text(text, sample_rate=22050, freq=self._fallback_freq), 22050
 
@@ -205,25 +212,33 @@ class YorubaTTSProvider(GoogleTTSProvider):
 
 # ---------- Audio helpers ---------- #
 
-def _audio_to_wav_bytes(audio: object, sample_rate: int) -> bytes:
-    """Convert HF pipeline audio output to PCM16 WAV bytes."""
+def _audio_to_wav_bytes(audio: bytes, sample_rate: int) -> bytes:
+    """Wrap raw PCM bytes (from Google or HF) into a standard WAV container."""
+    # audio might be a numpy array from HF or raw bytes from Google
     try:
         import numpy as np
-    except Exception as exc:  # pragma: no cover
-        raise InferenceError(f"numpy is required for real TTS conversion: {exc}") from exc
-
-    arr = np.asarray(audio, dtype=np.float32)
-    if arr.ndim > 1:
-        arr = arr[0]
-    arr = np.clip(arr, -1.0, 1.0)
+        if isinstance(audio, (list, np.ndarray)):
+            arr = np.asarray(audio, dtype=np.float32)
+            if arr.ndim > 1:
+                arr = arr[0]
+            arr = np.clip(arr, -1.0, 1.0)
+            pcm_bytes = (arr * 32767.0).astype(np.int16).tobytes()
+        else:
+            # Already bytes (e.g. from Google)
+            pcm_bytes = audio
+    except ImportError:
+        # Fallback if numpy is missing but we have raw bytes
+        if isinstance(audio, bytes):
+            pcm_bytes = audio
+        else:
+            raise InferenceError("numpy is required to convert HF model output to audio")
 
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
         wav.setframerate(sample_rate)
-        pcm = (arr * 32767.0).astype(np.int16)
-        wav.writeframes(pcm.tobytes())
+        wav.writeframes(pcm_bytes)
     return buf.getvalue()
 
 
