@@ -17,7 +17,7 @@ from app.config import settings
 from app.models.adapters import SpeechToText, TextToSpeech, TextTranslator, TranslationResult
 from app.models.errors import InferenceError
 
-HF_API_BASE = "https://api-inference.huggingface.co/models"
+HF_API_BASE = "https://router.huggingface.co/hf-inference/models"
 
 # NLLB language codes (the model requires these specific codes)
 NLLB_LANG_MAP = {
@@ -111,34 +111,9 @@ class _HFTextToAudioProvider(TextToSpeech):
         self._fallback_freq = fallback_freq
 
     def synthesize(self, text: str, lang: str, voice: str = "default") -> tuple[bytes, int]:
-        if settings.use_real_models:
-            try:
-                url = f"{HF_API_BASE}/{self.model_id}"
-                payload = {"inputs": text}
-                headers = _hf_headers()
-                resp = http_requests.post(url, json=payload, headers=headers, timeout=60)
-                resp.raise_for_status()
-
-                content_type = resp.headers.get("Content-Type", "")
-
-                # If the API returns audio bytes directly
-                if "audio" in content_type or "octet-stream" in content_type:
-                    return resp.content, 22050  # default sample rate
-
-                # If the API returns JSON with audio data
-                data = resp.json()
-                if isinstance(data, dict) and "audio" in data:
-                    import numpy as np
-                    audio = data["audio"]
-                    sample_rate = int(data.get("sampling_rate", 22050))
-                    return _audio_to_wav_bytes(audio, sample_rate), sample_rate
-
-                raise InferenceError(f"unexpected TTS response format from {self.model_id}")
-            except InferenceError:
-                raise
-            except Exception as exc:
-                raise InferenceError(f"tts failed ({self.model_id}): {exc}") from exc
-
+        # NOTE: HF free Inference API does not support text-to-speech tasks.
+        # We always use the local tone generator fallback for now.
+        # To enable real TTS, use a paid TTS API (Google Cloud TTS, ElevenLabs, etc.)
         return _tone_from_text(text, sample_rate=22050, freq=self._fallback_freq), 22050
 
 
