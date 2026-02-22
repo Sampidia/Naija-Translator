@@ -91,6 +91,7 @@ def speech_translate(
     audio_file: UploadFile = File(...),
     source_lang: str = "yo",
     target_lang: str = "en",
+    voice: str = Form("default"),
     _api: None = Depends(require_api_key),
     _rate: None = Depends(enforce_rate_limit),
 ) -> SpeechTranslateResponse:
@@ -101,7 +102,8 @@ def speech_translate(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     job_id = jobs.create()
-    jobs.enqueue_task(job_id, "english_tts", {"text": translated.text})
+    # Use the generic "tts" task which supports voice selection
+    jobs.enqueue_task(job_id, "tts", {"text": translated.text, "lang": "en", "voice": voice})
 
     return SpeechTranslateResponse(
         transcript_yo=transcript,

@@ -113,7 +113,7 @@
 
   <div class="card" style="background: #f9f9f9;">
     <label for="apiKey">API Key (if REQUIRE_API_KEY=true)</label>
-    <input id="apiKey" type="password" placeholder="Enter API Key..." />
+    <input id="apiKey" type="password" placeholder="Enter API Key... (Voices will load here)" />
   </div>
 
   <section class="card">
@@ -191,6 +191,10 @@
     <label>Option B: Upload audio file</label>
     <input id="speechFile" type="file" accept="audio/*" />
 
+    <label for="speechVoice">Voice for Audio (Optional)</label>
+    <select id="speechVoice">
+      <option value="default">Default (Auto)</option>
+    </select>
     <button id="speechBtn">Translate Speech</button>
     <p class="muted" id="speechTextOut"></p>
     <p id="speechTtsStatus" class="muted"></p>
@@ -244,8 +248,19 @@
 
     // Initial load
     window.onload = () => {
-      loadVoices('en', 'ttsVoice');
-      loadVoices('yo', 'translateVoice');
+      loadAllVoices();
+    };
+
+    function loadAllVoices() {
+      const target = document.getElementById('targetLang').value;
+      const tts = document.getElementById('ttsLang').value;
+      loadVoices(tts, 'ttsVoice');
+      loadVoices(target, 'translateVoice');
+      loadVoices('en', 'speechVoice'); // Section 3 always translates TO English
+    }
+
+    document.getElementById('apiKey').onchange = () => {
+      loadAllVoices();
     };
 
     document.getElementById('ttsLang').onchange = (e) => {
@@ -391,6 +406,7 @@
       const out = document.getElementById('speechTextOut');
       const statusEl = document.getElementById('speechTtsStatus');
       const audioEl = document.getElementById('speechAudio');
+      const voice = document.getElementById('speechVoice').value;
 
       // Prefer file upload if selected, otherwise use recorded audio
       let audioData = file || recordedBlob;
@@ -402,6 +418,7 @@
       out.textContent = 'Uploading & translating...';
       const form = new FormData();
       form.append('audio_file', audioData, audioData.name || 'recording.webm');
+      form.append('voice', voice); // Use selected voice
       try {
         const data = await fetchJson('/api/v1/speech/translate', { method: 'POST', body: form });
         out.textContent = `Transcript: ${data.transcript_yo} | EN: ${data.translated_text_en}`;
