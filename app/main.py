@@ -113,6 +113,15 @@ def speech_translate(
     )
 
 
+@app.get("/api/v1/voices")
+def get_voices(
+    lang: str = "en",
+    _api: None = Depends(require_api_key),
+) -> dict[str, list[dict]]:
+    provider = yoruba_tts if lang == "yo" else english_tts
+    return {"voices": provider.list_voices()}
+
+
 @app.get("/api/v1/audio/{audio_id}", response_model=None)
 def audio_stream(audio_id: str) -> FileResponse | RedirectResponse:
     try:

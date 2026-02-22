@@ -20,3 +20,6 @@ class SpeechToText:
 class TextToSpeech:
     def synthesize(self, text: str, lang: str, voice: str = "default") -> tuple[bytes, int]:
         raise NotImplementedError
+
+    def list_voices(self) -> list[dict]:
+        return []

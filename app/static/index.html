@@ -136,6 +136,10 @@
         </select>
       </div>
     </div>
+    <label for="translateVoice">Voice for Listen (Optional)</label>
+    <select id="translateVoice">
+      <option value="default">Default (Auto)</option>
+    </select>
     <button id="translateBtn">Translate</button>
     <p id="translateStatus" class="muted"></p>
     <label>Translated output</label>
@@ -159,6 +163,10 @@
     <select id="ttsLang">
       <option value="en">English</option>
       <option value="yo">Yoruba</option>
+    </select>
+    <label for="ttsVoice">Voice (Optional)</label>
+    <select id="ttsVoice">
+      <option value="default">Default (Auto)</option>
     </select>
     <button id="ttsBtn">Generate Audio</button>
     <p id="ttsStatus" class="muted"></p>
@@ -216,6 +224,38 @@
       throw new Error('Timeout waiting for TTS job to complete');
     }
 
+    async function loadVoices(lang, selectId) {
+      const select = document.getElementById(selectId);
+      try {
+        const data = await fetchJson(`/api/v1/voices?lang=${lang}`);
+        // Clear except first (Default)
+        while (select.options.length > 1) select.remove(1);
+
+        data.voices.forEach(v => {
+          const opt = document.createElement('option');
+          opt.value = v.name;
+          opt.textContent = `${v.name} (${v.ssml_gender})`;
+          select.appendChild(opt);
+        });
+      } catch (e) {
+        console.error("Failed to load voices:", e);
+      }
+    }
+
+    // Initial load
+    window.onload = () => {
+      loadVoices('en', 'ttsVoice');
+      loadVoices('yo', 'translateVoice');
+    };
+
+    document.getElementById('ttsLang').onchange = (e) => {
+      loadVoices(e.target.value, 'ttsVoice');
+    };
+
+    document.getElementById('targetLang').onchange = (e) => {
+      loadVoices(e.target.value, 'translateVoice');
+    };
+
     document.getElementById('translateBtn').onclick = async () => {
       const text = document.getElementById('translateText').value;
       const source_lang = document.getElementById('sourceLang').value;
@@ -250,6 +290,7 @@
     document.getElementById('listenBtn').onclick = async () => {
       const text = document.getElementById('translatedOut').value;
       const lang = document.getElementById('targetLang').value;
+      const voice = document.getElementById('translateVoice').value;
       const statusEl = document.getElementById('translateStatus');
       const audioEl = document.getElementById('translateOutAudio');
       const download = document.getElementById('downloadTranslateLink');
@@ -260,7 +301,7 @@
       try {
         const job = await fetchJson('/api/v1/tts', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, lang, voice: 'default' })
+          body: JSON.stringify({ text, lang, voice: voice })
         });
         const ready = await waitForAudio(job.job_id, statusEl);
         audioEl.src = ready.play_url;
@@ -275,6 +316,7 @@
     document.getElementById('ttsBtn').onclick = async () => {
       const text = document.getElementById('ttsText').value;
       const lang = document.getElementById('ttsLang').value;
+      const voice = document.getElementById('ttsVoice').value;
       const statusEl = document.getElementById('ttsStatus');
       const audioEl = document.getElementById('ttsAudio');
       const download = document.getElementById('downloadLink');
@@ -282,7 +324,7 @@
       try {
         const job = await fetchJson('/api/v1/tts', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, lang, voice: 'default' })
+          body: JSON.stringify({ text, lang, voice: voice })
         });
         const ready = await waitForAudio(job.job_id, statusEl);
         audioEl.src = ready.play_url;

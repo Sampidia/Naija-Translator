@@ -134,6 +134,24 @@ class GoogleTTSProvider(TextToSpeech):
         self._fallback_freq = fallback_freq
         self._client = None
 
+    def list_voices(self) -> list[dict]:
+        client = self._get_client()
+        if not client:
+            return []
+        try:
+            response = client.list_voices(language_code=self.language_code)
+            voices = []
+            for voice in response.voices:
+                voices.append({
+                    "name": voice.name,
+                    "ssml_gender": str(voice.ssml_gender),
+                    "language_codes": list(voice.language_codes)
+                })
+            return voices
+        except Exception as e:
+            print(f"Error listing voices: {e}")
+            return []
+
     def _get_client(self):
         if self._client:
             return self._client
@@ -156,10 +174,24 @@ class GoogleTTSProvider(TextToSpeech):
     def synthesize(self, text: str, lang: str, voice: str = "default") -> tuple[bytes, int]:
         client = self._get_client()
         if client:
-            # Try specific voice first, then fall back to auto-select
-            voice_names_to_try = [self.voice_name, None]
+            # Order of preference: 
+            # 1. Explicitly requested 'voice' (if not "default")
+            # 2. Pre-configured 'self.voice_name'
+            # 3. AUTO (None)
             
-            for v_name in voice_names_to_try:
+            voices_to_try = []
+            if voice and voice != "default":
+                voices_to_try.append(voice)
+            voices_to_try.append(self.voice_name)
+            voices_to_try.append(None) # AUTO fallback
+            
+            # Remove duplicates while preserving order
+            unique_voices = []
+            for v in voices_to_try:
+                if v not in unique_voices:
+                    unique_voices.append(v)
+            
+            for v_name in unique_voices:
                 try:
                     print(f"DEBUG: Generating Google TTS for '{text[:20]}...' lang={self.language_code} voice={v_name or 'AUTO'}")
                     s_input = texttospeech.SynthesisInput(text=text)
@@ -182,7 +214,6 @@ class GoogleTTSProvider(TextToSpeech):
                     return wav_bytes, sample_rate
                 except Exception as e:
                     print(f"DEBUG: Google TTS attempt failed (v={v_name or 'AUTO'}): {e}")
-                    # Continue to next attempt (None) or exit loop
                     continue
         else:
             print("WARNING: Google TTS client not initialized (check credentials JSON)")
