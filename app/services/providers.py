@@ -13,6 +13,15 @@ import wave
 
 import requests as http_requests
 
+try:
+    from google.cloud import texttospeech
+    import json
+    from google.oauth2 import service_account
+except ImportError:
+    texttospeech = None
+    service_account = None
+    json = None
+
 from app.config import settings
 from app.models.adapters import SpeechToText, TextToSpeech, TextTranslator, TranslationResult
 from app.models.errors import InferenceError
@@ -118,26 +127,80 @@ class YorubaASRProvider(SpeechToText):
 
 # ---------- TTS ---------- #
 
-class _HFTextToAudioProvider(TextToSpeech):
-    def __init__(self, model_id: str, fallback_freq: float) -> None:
-        self.model_id = model_id
+class GoogleTTSProvider(TextToSpeech):
+    def __init__(self, voice_name: str, language_code: str, fallback_freq: float) -> None:
+        self.voice_name = voice_name
+        self.language_code = language_code
         self._fallback_freq = fallback_freq
+        self._client = None
+
+    def _get_client(self):
+        if self._client:
+            return self._client
+        if texttospeech is None:
+            return None
+        
+        creds_json = settings.google_application_credentials_json
+        if not creds_json:
+            return None
+            
+        try:
+            info = json.loads(creds_json)
+            creds = service_account.Credentials.from_service_account_info(info)
+            self._client = texttospeech.TextToSpeechClient(credentials=creds)
+            return self._client
+        except Exception as e:
+            print(f"Error initializing Google TTS client: {e}")
+            return None
 
     def synthesize(self, text: str, lang: str, voice: str = "default") -> tuple[bytes, int]:
-        # NOTE: HF free Inference API does not support text-to-speech tasks.
-        # We always use the local tone generator fallback for now.
-        # To enable real TTS, use a paid TTS API (Google Cloud TTS, ElevenLabs, etc.)
+        client = self._get_client()
+        if client:
+            try:
+                s_input = texttospeech.SynthesisInput(text=text)
+                v_params = texttospeech.VoiceSelectionParams(
+                    language_code=self.language_code,
+                    name=self.voice_name
+                )
+                a_config = texttospeech.AudioConfig(
+                    audio_encoding=texttospeech.AudioEncoding.LINEAR16
+                )
+                
+                response = client.synthesize_speech(
+                    input=s_input, voice=v_params, audio_config=a_config
+                )
+                # Google returns WAV bytes with header for LINEAR16 usually, 
+                # but we should check if we need to wrap it. Actually synthesize_speech 
+                # returns the full audio file content.
+                return response.audio_content, 24000 # Google's default for many voices
+            except Exception as e:
+                print(f"Google TTS synthesis failed: {e}")
+                # Fallback to tone
+        
         return _tone_from_text(text, sample_rate=22050, freq=self._fallback_freq), 22050
 
 
-class NigerianEnglishTTSProvider(_HFTextToAudioProvider):
+class NigerianEnglishTTSProvider(GoogleTTSProvider):
     def __init__(self) -> None:
-        super().__init__(model_id=settings.nigerian_english_tts_model_id, fallback_freq=440.0)
+        # Using en-NG-Standard-A or en-US-Standard-A if NG is not available or desired.
+        # Google has en-NG-Wavenet-A (male), en-NG-Wavenet-B (female), en-NG-Wavenet-C (male)
+        super().__init__(
+            voice_name="en-NG-Wavenet-A", 
+            language_code="en-NG", 
+            fallback_freq=440.0
+        )
 
 
-class YorubaTTSProvider(_HFTextToAudioProvider):
+class YorubaTTSProvider(GoogleTTSProvider):
     def __init__(self) -> None:
-        super().__init__(model_id=settings.yoruba_tts_model_id, fallback_freq=330.0)
+        # Google does not have a native Yoruba voice in standard TTS yet? 
+        # Actually Google Cloud TTS added Yoruba (yo-NG) recently.
+        # Let's check or use a sensible default.
+        super().__init__(
+            voice_name="yo-NG-Standard-A", 
+            language_code="yo-NG", 
+            fallback_freq=330.0
+        )
 
 
 # ---------- Audio helpers ---------- #

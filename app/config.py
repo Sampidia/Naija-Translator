@@ -40,6 +40,7 @@ class Settings:
     supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     supabase_bucket: str = os.getenv("SUPABASE_BUCKET", "audio")
     supabase_key_prefix: str = os.getenv("SUPABASE_KEY_PREFIX", "audio")
+    google_application_credentials_json: str | None = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
 
 settings = Settings()

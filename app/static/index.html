@@ -83,6 +83,27 @@
         opacity: 0.6;
       }
     }
+
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-group button {
+      margin-bottom: 0;
+      flex: 1;
+    }
+
+    .btn-outline {
+      background: #fff;
+      color: #333;
+      border: 1px solid #ccc;
+    }
+
+    .btn-outline:hover {
+      background: #f0f0f0;
+    }
   </style>
 </head>
 
@@ -119,6 +140,15 @@
     <p id="translateStatus" class="muted"></p>
     <label>Translated output</label>
     <textarea id="translatedOut" rows="3" readonly></textarea>
+    <div id="translateAudioGroup" style="display:none;">
+      <div class="btn-group">
+        <button id="listenBtn" class="btn-outline">🔊 Listen</button>
+        <a id="downloadTranslateLink" class="btn-outline"
+          style="text-decoration:none; display:flex; align-items:center; justify-content:center; border-radius:3px; font-size: 0.8rem; height: 36px;"
+          download>💾 Download</a>
+      </div>
+      <audio id="translateOutAudio" controls style="margin-top:0.5rem;"></audio>
+    </div>
   </section>
 
   <section class="card">
@@ -208,9 +238,36 @@
         });
         out.value = data.translated_text;
         statusEl.textContent = `Model used: ${data.model} (${source_lang} -> ${target_lang})`;
+        // Show audio controls
+        document.getElementById('translateAudioGroup').style.display = 'block';
       } catch (e) {
         out.value = `Error: ${e.message}`;
         statusEl.textContent = 'Translation failed';
+        document.getElementById('translateAudioGroup').style.display = 'none';
+      }
+    };
+
+    document.getElementById('listenBtn').onclick = async () => {
+      const text = document.getElementById('translatedOut').value;
+      const lang = document.getElementById('targetLang').value;
+      const statusEl = document.getElementById('translateStatus');
+      const audioEl = document.getElementById('translateOutAudio');
+      const download = document.getElementById('downloadTranslateLink');
+
+      if (!text) return;
+
+      statusEl.textContent = 'Generating speech...';
+      try {
+        const job = await fetchJson('/api/v1/tts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, lang, voice: 'default' })
+        });
+        const ready = await waitForAudio(job.job_id, statusEl);
+        audioEl.src = ready.play_url;
+        download.href = ready.download_url;
+        statusEl.textContent = 'Speech ready.';
+      } catch (e) {
+        statusEl.textContent = `Speech error: ${e.message}`;
       }
     };
 
