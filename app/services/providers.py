@@ -1,13 +1,34 @@
+"""ML providers using the Hugging Face Inference API (HTTP).
+
+This avoids loading multi-GB models into RAM, making it compatible
+with Render's free tier (512 MB).  When USE_REAL_MODELS is False the
+providers still return safe local fallbacks for development.
+"""
+
 import io
-import os
 import math
+import os
 import struct
 import wave
+
+import requests as http_requests
 
 from app.config import settings
 from app.models.adapters import SpeechToText, TextToSpeech, TextTranslator, TranslationResult
 from app.models.errors import InferenceError
 
+HF_API_BASE = "https://api-inference.huggingface.co/models"
+
+
+def _hf_headers() -> dict[str, str]:
+    token = os.getenv("HF_TOKEN", "").strip()
+    headers: dict[str, str] = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+# ---------- Translation ---------- #
 
 class SimpleTranslator(TextTranslator):
     def __init__(self) -> None:
@@ -15,7 +36,6 @@ class SimpleTranslator(TextTranslator):
             ("en", "yo"): settings.en_yo_model_id,
             ("yo", "en"): settings.yo_en_model_id,
         }
-        self._pipelines: dict[tuple[str, str], object] = {}
 
     def translate(self, text: str, source_lang: str, target_lang: str) -> TranslationResult:
         model_id = self.model_ids.get((source_lang, target_lang), "demo/unsupported")
@@ -24,50 +44,41 @@ class SimpleTranslator(TextTranslator):
 
         if settings.use_real_models:
             try:
-                pipe = self._get_pipeline(source_lang, target_lang, model_id)
-                output = pipe(text)
-                translated = output[0]["translation_text"]
+                url = f"{HF_API_BASE}/{model_id}"
+                payload = {"inputs": text}
+                resp = http_requests.post(url, json=payload, headers=_hf_headers(), timeout=30)
+                resp.raise_for_status()
+                data = resp.json()
+
+                # HF translation returns [{"translation_text": "..."}]
+                if isinstance(data, list) and data:
+                    translated = data[0].get("translation_text", text)
+                else:
+                    translated = str(data)
+
                 return TranslationResult(text=translated, model_id=model_id)
             except Exception as exc:
-                raise InferenceError(f"translation failed: {exc}") from exc
+                raise InferenceError(f"translation failed ({model_id}): {exc}") from exc
 
         translated = f"[YO] {text}" if (source_lang, target_lang) == ("en", "yo") else f"[EN] {text}"
         return TranslationResult(text=translated, model_id=model_id)
 
-    def _get_pipeline(self, source_lang: str, target_lang: str, model_id: str):
-        key = (source_lang, target_lang)
-        if key in self._pipelines:
-            return self._pipelines[key]
-        from transformers import pipeline
 
-        token = os.getenv("HF_TOKEN")
-        kwargs = {"model": model_id}
-        if token and token.strip():
-            kwargs["token"] = token.strip()
-        
-        self._pipelines[key] = pipeline("translation", **kwargs)
-        return self._pipelines[key]
-
+# ---------- ASR ---------- #
 
 class YorubaASRProvider(SpeechToText):
     model_id = settings.yoruba_asr_model_id
 
-    def __init__(self) -> None:
-        self._pipe = None
-
     def transcribe(self, audio_bytes: bytes, source_lang: str) -> tuple[str, str]:
         if settings.use_real_models:
             try:
-                if self._pipe is None:
-                    from transformers import pipeline
-
-                    token = os.getenv("HF_TOKEN")
-                    kwargs = {"model": self.model_id}
-                    if token and token.strip():
-                        kwargs["token"] = token.strip()
-                    self._pipe = pipeline("automatic-speech-recognition", **kwargs)
-                result = self._pipe(audio_bytes)
-                text = result["text"] if isinstance(result, dict) else str(result)
+                url = f"{HF_API_BASE}/{self.model_id}"
+                headers = _hf_headers()
+                headers["Content-Type"] = "audio/wav"
+                resp = http_requests.post(url, data=audio_bytes, headers=headers, timeout=60)
+                resp.raise_for_status()
+                data = resp.json()
+                text = data.get("text", str(data)) if isinstance(data, dict) else str(data)
                 return text, self.model_id
             except Exception as exc:
                 raise InferenceError(f"asr failed: {exc}") from exc
@@ -75,35 +86,43 @@ class YorubaASRProvider(SpeechToText):
         return "eyi je apeere transcription", self.model_id
 
 
+# ---------- TTS ---------- #
+
 class _HFTextToAudioProvider(TextToSpeech):
     def __init__(self, model_id: str, fallback_freq: float) -> None:
         self.model_id = model_id
-        self._pipe = None
         self._fallback_freq = fallback_freq
 
     def synthesize(self, text: str, lang: str, voice: str = "default") -> tuple[bytes, int]:
         if settings.use_real_models:
             try:
-                audio, sample_rate = self._infer(text)
-                return _audio_to_wav_bytes(audio, sample_rate), sample_rate
+                url = f"{HF_API_BASE}/{self.model_id}"
+                payload = {"inputs": text}
+                headers = _hf_headers()
+                resp = http_requests.post(url, json=payload, headers=headers, timeout=60)
+                resp.raise_for_status()
+
+                content_type = resp.headers.get("Content-Type", "")
+
+                # If the API returns audio bytes directly
+                if "audio" in content_type or "octet-stream" in content_type:
+                    return resp.content, 22050  # default sample rate
+
+                # If the API returns JSON with audio data
+                data = resp.json()
+                if isinstance(data, dict) and "audio" in data:
+                    import numpy as np
+                    audio = data["audio"]
+                    sample_rate = int(data.get("sampling_rate", 22050))
+                    return _audio_to_wav_bytes(audio, sample_rate), sample_rate
+
+                raise InferenceError(f"unexpected TTS response format from {self.model_id}")
+            except InferenceError:
+                raise
             except Exception as exc:
                 raise InferenceError(f"tts failed ({self.model_id}): {exc}") from exc
+
         return _tone_from_text(text, sample_rate=22050, freq=self._fallback_freq), 22050
-
-    def _infer(self, text: str) -> tuple[object, int]:
-        if self._pipe is None:
-            from transformers import pipeline
-
-            token = os.getenv("HF_TOKEN")
-            kwargs = {"model": self.model_id}
-            if token and token.strip():
-                kwargs["token"] = token.strip()
-            self._pipe = pipeline("text-to-audio", **kwargs)
-
-        result = self._pipe(text)
-        if isinstance(result, dict) and "audio" in result and "sampling_rate" in result:
-            return result["audio"], int(result["sampling_rate"])
-        raise InferenceError("unexpected TTS pipeline output")
 
 
 class NigerianEnglishTTSProvider(_HFTextToAudioProvider):
@@ -115,6 +134,8 @@ class YorubaTTSProvider(_HFTextToAudioProvider):
     def __init__(self) -> None:
         super().__init__(model_id=settings.yoruba_tts_model_id, fallback_freq=330.0)
 
+
+# ---------- Audio helpers ---------- #
 
 def _audio_to_wav_bytes(audio: object, sample_rate: int) -> bytes:
     """Convert HF pipeline audio output to PCM16 WAV bytes."""

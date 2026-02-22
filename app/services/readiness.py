@@ -37,8 +37,12 @@ def _check_audio_backend() -> str:
 def _check_real_model_dependencies() -> str:
     if not settings.use_real_models:
         return "ok"
+    # We now use HF Inference API (HTTP), only need requests
     try:
-        import transformers  # noqa: F401
+        import requests  # noqa: F401
     except Exception:
         return "error"
+    token = os.getenv("HF_TOKEN", "").strip()
+    if not token:
+        return "warning:no_hf_token"
     return "ok"
