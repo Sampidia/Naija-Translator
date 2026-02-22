@@ -332,6 +332,24 @@ class YorubaTTSProvider(GoogleTTSProvider):
         )
 
 
+class HausaTTSProvider(GoogleTTSProvider):
+    def __init__(self) -> None:
+        super().__init__(
+            voice_name="ha-NG-Standard-A", 
+            language_code="ha-NG", 
+            fallback_freq=350.0
+        )
+
+
+class IgboTTSProvider(GoogleTTSProvider):
+    def __init__(self) -> None:
+        super().__init__(
+            voice_name="ig-NG-Standard-A", 
+            language_code="ig-NG", 
+            fallback_freq=370.0
+        )
+
+
 # ---------- Audio helpers ---------- #
 
 def _audio_to_wav_bytes(audio: bytes, sample_rate: int) -> bytes:

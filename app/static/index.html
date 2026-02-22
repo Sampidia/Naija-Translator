@@ -214,6 +214,8 @@
         <select id="gSourceLang">
           <option value="en">English</option>
           <option value="yo">Yoruba</option>
+          <option value="ig">Igbo</option>
+          <option value="ha">Hausa</option>
         </select>
       </div>
       <div>
@@ -221,6 +223,8 @@
         <select id="gTargetLang">
           <option value="yo" selected>Yoruba</option>
           <option value="en">English</option>
+          <option value="ig">Igbo</option>
+          <option value="ha">Hausa</option>
         </select>
       </div>
     </div>
@@ -236,6 +240,9 @@
     <div id="gTranslateAudioGroup" style="display:none;">
       <div class="btn-group">
         <button id="gListenBtn" class="btn-outline">🔊 Listen</button>
+        <a id="gDownloadTranslateLink" class="btn-outline"
+          style="text-decoration:none; display:flex; align-items:center; justify-content:center; border-radius:3px; font-size: 0.8rem; height: 36px;"
+          download>💾 Download</a>
       </div>
       <audio id="gTranslateOutAudio" controls style="margin-top:0.5rem;"></audio>
     </div>
@@ -542,6 +549,7 @@
       const voice = document.getElementById('gTranslateVoice').value;
       const statusEl = document.getElementById('gTranslateStatus');
       const audioEl = document.getElementById('gTranslateOutAudio');
+      const download = document.getElementById('gDownloadTranslateLink');
 
       if (!text) return;
       statusEl.textContent = 'Generating Google speech...';
@@ -553,6 +561,7 @@
         const ready = await waitForAudio(job.job_id, statusEl);
         audioEl.src = ready.play_url;
         audioEl.play().catch(e => console.log("Autoplay blocked:", e));
+        download.href = ready.download_url;
         statusEl.textContent = 'Google audio ready.';
       } catch (e) {
         statusEl.textContent = `Speech error: ${e.message}`;

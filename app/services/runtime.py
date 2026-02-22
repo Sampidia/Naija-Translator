@@ -4,6 +4,8 @@ from app.services.providers import (
     SimpleTranslator,
     YorubaASRProvider,
     YorubaTTSProvider,
+    HausaTTSProvider,
+    IgboTTSProvider,
     GoogleTranslationProvider,
     GoogleSTTProvider,
 )
@@ -15,6 +17,8 @@ asr = YorubaASRProvider()
 google_asr = GoogleSTTProvider()
 english_tts = NigerianEnglishTTSProvider()
 yoruba_tts = YorubaTTSProvider()
+hausa_tts = HausaTTSProvider()
+igbo_tts = IgboTTSProvider()
 audio_store = build_audio_store()
 jobs = JobManager()
 
@@ -23,7 +27,16 @@ def _task_tts(payload: dict) -> AudioAsset:
     text = str(payload.get("text", ""))
     lang = str(payload.get("lang", "en"))
     voice = str(payload.get("voice", "default"))
-    provider = yoruba_tts if lang == "yo" else english_tts
+    
+    # Map language codes to providers
+    providers = {
+        "en": english_tts,
+        "yo": yoruba_tts,
+        "ha": hausa_tts,
+        "ig": igbo_tts,
+    }
+    provider = providers.get(lang, english_tts)
+    
     wav, rate = provider.synthesize(text, lang, voice)
     return audio_store.save_wav(wav, rate)
 
