@@ -1,0 +1,51 @@
+from app.services.jobs import JobManager
+from app.services.providers import (
+    NigerianEnglishTTSProvider,
+    SimpleTranslator,
+    YorubaASRProvider,
+    YorubaTTSProvider,
+    HausaTTSProvider,
+    IgboTTSProvider,
+    GoogleTranslationProvider,
+    GoogleSTTProvider,
+)
+from app.services.store import AudioAsset, build_audio_store
+
+translator = SimpleTranslator()
+google_translator = GoogleTranslationProvider()
+asr = YorubaASRProvider()
+google_asr = GoogleSTTProvider()
+english_tts = NigerianEnglishTTSProvider()
+yoruba_tts = YorubaTTSProvider()
+hausa_tts = HausaTTSProvider()
+igbo_tts = IgboTTSProvider()
+audio_store = build_audio_store()
+jobs = JobManager()
+
+
+def _task_tts(payload: dict) -> AudioAsset:
+    text = str(payload.get("text", ""))
+    lang = str(payload.get("lang", "en"))
+    voice = str(payload.get("voice", "default"))
+    
+    # Map language codes to providers
+    providers = {
+        "en": english_tts,
+        "yo": yoruba_tts,
+        "ha": hausa_tts,
+        "ig": igbo_tts,
+    }
+    provider = providers.get(lang, english_tts)
+    
+    wav, rate = provider.synthesize(text, lang, voice)
+    return audio_store.save_wav(wav, rate)
+
+
+def _task_english_tts(payload: dict) -> AudioAsset:
+    text = str(payload.get("text", ""))
+    wav, rate = english_tts.synthesize(text, lang="en")
+    return audio_store.save_wav(wav, rate)
+
+
+jobs.register_task("tts", _task_tts)
+jobs.register_task("english_tts", _task_english_tts)

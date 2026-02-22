@@ -1,0 +1,27 @@
+services:
+  # API Service (Free Tier compatible)
+  - type: web
+    name: naija-translator-api
+    plan: free # Explicitly use the free tier to avoid payment info requests
+    env: python
+    # For Free Tier, we use 'plan: free' explicitly if needed, but usually the UI handles it.
+    # We remove the Worker and Redis as they are paid on Render unless using external free providers.
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11" # Render requires major.minor.patch
+      - key: AUDIO_BACKEND
+        value: supabase
+      - key: USE_REAL_MODELS
+        value: "true"
+      - key: REQUIRE_API_KEY
+        value: "true"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: USE_REDIS_JOBS
+        value: "false" # Redis is not free on Render
+      - key: EN_YO_MODEL_ID
+        value: "google/madlad400-3b-mt" # Supports 400+ languages including Yoruba
+      # IMPORTANT: Set HF_TOKEN manually in the Render Dashboard > Environment tab.
+      # Do NOT put it here or it will be overridden with empty on every deploy.
