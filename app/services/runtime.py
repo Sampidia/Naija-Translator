@@ -4,11 +4,15 @@ from app.services.providers import (
     SimpleTranslator,
     YorubaASRProvider,
     YorubaTTSProvider,
+    GoogleTranslationProvider,
+    GoogleSTTProvider,
 )
 from app.services.store import AudioAsset, build_audio_store
 
 translator = SimpleTranslator()
+google_translator = GoogleTranslationProvider()
 asr = YorubaASRProvider()
+google_asr = GoogleSTTProvider()
 english_tts = NigerianEnglishTTSProvider()
 yoruba_tts = YorubaTTSProvider()
 audio_store = build_audio_store()

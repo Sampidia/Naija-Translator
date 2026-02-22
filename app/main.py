@@ -12,7 +12,16 @@ from app.schemas import (
     TranslateRequest,
     TranslateResponse,
 )
-from app.services.runtime import asr, audio_store, english_tts, jobs, translator, yoruba_tts
+from app.services.runtime import (
+    asr,
+    audio_store,
+    english_tts,
+    jobs,
+    translator,
+    yoruba_tts,
+    google_translator,
+    google_asr,
+)
 from app.services.readiness import evaluate_readiness
 from app.services.security import enforce_rate_limit, require_api_key
 
@@ -104,6 +113,48 @@ def speech_translate(
     job_id = jobs.create()
     # Use the generic "tts" task which supports voice selection
     jobs.enqueue_task(job_id, "tts", {"text": translated.text, "lang": "en", "voice": voice})
+
+    return SpeechTranslateResponse(
+        transcript_yo=transcript,
+        translated_text_en=translated.text,
+        asr_model=asr_model,
+        translation_model=translated.model_id,
+        tts_job_id=job_id,
+        tts_status="queued",
+    )
+
+
+@app.post("/api/v1/google/translate", response_model=TranslateResponse)
+def google_translate(
+    payload: TranslateRequest,
+    _api: None = Depends(require_api_key),
+    _rate: None = Depends(enforce_rate_limit),
+) -> TranslateResponse:
+    try:
+        result = google_translator.translate(payload.text, payload.source_lang, payload.target_lang)
+    except InferenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return TranslateResponse(translated_text=result.text, model=result.model_id)
+
+
+@app.post("/api/v1/google/speech/translate", response_model=SpeechTranslateResponse)
+def google_speech_translate(
+    request: Request,
+    audio_file: UploadFile = File(...),
+    source_lang: str = "yo",
+    target_lang: str = "en",
+    voice: str = Form("default"),
+    _api: None = Depends(require_api_key),
+    _rate: None = Depends(enforce_rate_limit),
+) -> SpeechTranslateResponse:
+    try:
+        transcript, asr_model = google_asr.transcribe(audio_file.file.read(), source_lang)
+        translated = google_translator.translate(transcript, source_lang, target_lang)
+    except InferenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    job_id = jobs.create()
+    jobs.enqueue_task(job_id, "tts", {"text": translated.text, "lang": target_lang, "voice": voice})
 
     return SpeechTranslateResponse(
         transcript_yo=transcript,

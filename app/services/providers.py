@@ -15,10 +15,14 @@ import requests as http_requests
 
 try:
     from google.cloud import texttospeech
+    from google.cloud import translate_v2 as translate
+    from google.cloud import speech
     import json
     from google.oauth2 import service_account
 except ImportError:
     texttospeech = None
+    translate = None
+    speech = None
     service_account = None
     json = None
 
@@ -103,6 +107,37 @@ class SimpleTranslator(TextTranslator):
         return TranslationResult(text=translated, model_id=self.model_id)
 
 
+class GoogleTranslationProvider(TextTranslator):
+    def __init__(self) -> None:
+        self.model_id = "google-cloud-translate-v2"
+        self._client = None
+
+    def _get_client(self):
+        if self._client: return self._client
+        if translate is None: return None
+        creds_json = settings.google_application_credentials_json
+        if not creds_json: return None
+        try:
+            info = json.loads(creds_json)
+            creds = service_account.Credentials.from_service_account_info(info)
+            self._client = translate.Client(credentials=creds)
+            return self._client
+        except Exception: return None
+
+    def translate(self, text: str, source_lang: str, target_lang: str) -> TranslationResult:
+        client = self._get_client()
+        if not client:
+            # Fallback to MADLAD if Google Translate is not configured
+            return SimpleTranslator().translate(text, source_lang, target_lang)
+        
+        try:
+            result = client.translate(text, target_language=target_lang, source_language=source_lang)
+            return TranslationResult(text=result["translatedText"], model_id=self.model_id)
+        except Exception as e:
+            print(f"DEBUG: Google Translate failed: {e}")
+            return SimpleTranslator().translate(text, source_lang, target_lang)
+
+
 # ---------- ASR ---------- #
 
 class YorubaASRProvider(SpeechToText):
@@ -123,6 +158,54 @@ class YorubaASRProvider(SpeechToText):
                 raise InferenceError(f"asr failed: {exc}") from exc
 
         return "eyi je apeere transcription", self.model_id
+
+
+class GoogleSTTProvider(SpeechToText):
+    def __init__(self) -> None:
+        self.model_id = "google-cloud-speech-v1"
+        self._client = None
+
+    def _get_client(self):
+        if self._client: return self._client
+        if speech is None: return None
+        creds_json = settings.google_application_credentials_json
+        if not creds_json: return None
+        try:
+            info = json.loads(creds_json)
+            creds = service_account.Credentials.from_service_account_info(info)
+            self._client = speech.SpeechClient(credentials=creds)
+            return self._client
+        except Exception: return None
+
+    def transcribe(self, audio_bytes: bytes, source_lang: str) -> tuple[str, str]:
+        client = self._get_client()
+        if not client:
+            return YorubaASRProvider().transcribe(audio_bytes, source_lang)
+        
+        try:
+            # Google STT needs audio config
+            audio = speech.RecognitionAudio(content=audio_bytes)
+            # Use yo-NG for Yoruba, en-NG for English
+            lang_code = "yo-NG" if source_lang == "yo" else "en-NG"
+            config = speech.RecognitionConfig(
+                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+                language_code=lang_code,
+                enable_automatic_punctuation=True,
+            )
+            
+            response = client.recognize(config=config, audio=audio)
+            transcript = ""
+            for result in response.results:
+                transcript += result.alternatives[0].transcript
+            
+            if not transcript:
+                print("DEBUG: Google STT returned empty transcript")
+                return YorubaASRProvider().transcribe(audio_bytes, source_lang)
+                
+            return transcript, self.model_id
+        except Exception as e:
+            print(f"DEBUG: Google STT failed: {e}")
+            return YorubaASRProvider().transcribe(audio_bytes, source_lang)
 
 
 # ---------- TTS ---------- #
