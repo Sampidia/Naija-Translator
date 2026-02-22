@@ -55,8 +55,27 @@ class SimpleTranslator(TextTranslator):
 
                 url = f"{HF_API_BASE}/{model_id}"
                 payload = {"inputs": formatted_input}
-                resp = http_requests.post(url, json=payload, headers=_hf_headers(), timeout=60)
-                resp.raise_for_status()
+                headers = _hf_headers()
+                # Tell HF to wait for model to load (cold start can take 2+ min)
+                headers["x-wait-for-model"] = "true"
+
+                # Retry up to 2 times for cold starts
+                last_exc = None
+                for attempt in range(2):
+                    try:
+                        resp = http_requests.post(
+                            url, json=payload, headers=headers, timeout=180
+                        )
+                        resp.raise_for_status()
+                        break
+                    except Exception as e:
+                        last_exc = e
+                        if attempt == 0:
+                            import time
+                            time.sleep(5)  # brief pause before retry
+                else:
+                    raise last_exc  # type: ignore[misc]
+
                 data = resp.json()
 
                 # HF translation returns [{"translation_text": "..."}]
