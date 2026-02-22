@@ -19,10 +19,10 @@ from app.models.errors import InferenceError
 
 HF_API_BASE = "https://router.huggingface.co/hf-inference/models"
 
-# NLLB language codes (the model requires these specific codes)
-NLLB_LANG_MAP = {
-    "en": "eng_Latn",
-    "yo": "yor_Latn",
+# MADLAD400 uses <2xx> prefix for target language
+MADLAD_LANG_MAP = {
+    "en": "en",
+    "yo": "yo",
 }
 
 
@@ -38,9 +38,8 @@ def _hf_headers() -> dict[str, str]:
 
 class SimpleTranslator(TextTranslator):
     def __init__(self) -> None:
-        # Use a single multilingual model for both directions
-        self.model_id = settings.en_yo_model_id  # nllb-200-distilled-600M
-        self.yo_en_model_id = settings.yo_en_model_id
+        # google/madlad400-3b-mt supports 400+ languages including Yoruba
+        self.model_id = settings.en_yo_model_id
 
     def translate(self, text: str, source_lang: str, target_lang: str) -> TranslationResult:
         if source_lang == target_lang:
@@ -48,19 +47,14 @@ class SimpleTranslator(TextTranslator):
 
         if settings.use_real_models:
             try:
-                # Choose model: use the multilingual NLLB model 
                 model_id = self.model_id
-                src_code = NLLB_LANG_MAP.get(source_lang, source_lang)
-                tgt_code = NLLB_LANG_MAP.get(target_lang, target_lang)
+                tgt_code = MADLAD_LANG_MAP.get(target_lang, target_lang)
+
+                # MADLAD400 format: prefix input with <2xx> target language tag
+                formatted_input = f"<2{tgt_code}> {text}"
 
                 url = f"{HF_API_BASE}/{model_id}"
-                payload = {
-                    "inputs": text,
-                    "parameters": {
-                        "src_lang": src_code,
-                        "tgt_lang": tgt_code,
-                    }
-                }
+                payload = {"inputs": formatted_input}
                 resp = http_requests.post(url, json=payload, headers=_hf_headers(), timeout=60)
                 resp.raise_for_status()
                 data = resp.json()

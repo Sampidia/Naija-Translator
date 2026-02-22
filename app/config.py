@@ -13,9 +13,9 @@ class Settings:
     local_audio_root: str = os.getenv("LOCAL_AUDIO_ROOT", "app/storage/audio")
 
     use_real_models: bool = get_bool("USE_REAL_MODELS", False)
-    en_yo_model_id: str = os.getenv("EN_YO_MODEL_ID", "facebook/nllb-200-distilled-600M")
-    yo_en_model_id: str = os.getenv("YO_EN_MODEL_ID", "Helsinki-NLP/opus-mt-yo-en")
-    yoruba_asr_model_id: str = os.getenv("YORUBA_ASR_MODEL_ID", "NCAIR1/Yoruba-ASR")
+    en_yo_model_id: str = os.getenv("EN_YO_MODEL_ID", "google/madlad400-3b-mt")
+    yo_en_model_id: str = os.getenv("YO_EN_MODEL_ID", "google/madlad400-3b-mt")
+    yoruba_asr_model_id: str = os.getenv("YORUBA_ASR_MODEL_ID", "openai/whisper-large-v3")
     nigerian_english_tts_model_id: str = os.getenv(
         "NIGERIAN_ENGLISH_TTS_MODEL_ID", "facebook/mms-tts-eng"
     )

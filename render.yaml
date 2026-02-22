@@ -22,6 +22,6 @@ services:
       - key: USE_REDIS_JOBS
         value: "false" # Redis is not free on Render
       - key: EN_YO_MODEL_ID
-        value: "facebook/nllb-200-distilled-600M" # Multilingual model supporting Yoruba
+        value: "google/madlad400-3b-mt" # Supports 400+ languages including Yoruba
       # IMPORTANT: Set HF_TOKEN manually in the Render Dashboard > Environment tab.
       # Do NOT put it here or it will be overridden with empty on every deploy.
