@@ -21,5 +21,7 @@ services:
         value: "60"
       - key: USE_REDIS_JOBS
         value: "false" # Redis is not free on Render
-      - key: HF_TOKEN # Add your Hugging Face token in Render Dashboard
-        value: ""
+      - key: EN_YO_MODEL_ID
+        value: "Helsinki-NLP/opus-mt-en-mul" # en-yo doesn't exist, use en-mul which supports Yoruba
+      # IMPORTANT: Set HF_TOKEN manually in the Render Dashboard > Environment tab.
+      # Do NOT put it here or it will be overridden with empty on every deploy.
