@@ -156,31 +156,34 @@ class GoogleTTSProvider(TextToSpeech):
     def synthesize(self, text: str, lang: str, voice: str = "default") -> tuple[bytes, int]:
         client = self._get_client()
         if client:
-            try:
-                print(f"DEBUG: Generating Google TTS for '{text[:20]}...' in {self.language_code}")
-                s_input = texttospeech.SynthesisInput(text=text)
-                v_params = texttospeech.VoiceSelectionParams(
-                    language_code=self.language_code,
-                    name=self.voice_name
-                )
-                a_config = texttospeech.AudioConfig(
-                    audio_encoding=texttospeech.AudioEncoding.LINEAR16
-                )
-                
-                response = client.synthesize_speech(
-                    input=s_input, voice=v_params, audio_config=a_config
-                )
-                
-                # Google LINEAR16 returns raw PCM bytes. We MUST wrap it in a WAV header
-                # so the browser player can recognize it.
-                sample_rate = 24000
-                wav_bytes = _audio_to_wav_bytes(response.audio_content, sample_rate)
-                
-                print(f"DEBUG: Successfully generated {len(wav_bytes)} bytes of audio")
-                return wav_bytes, sample_rate
-            except Exception as e:
-                print(f"ERROR: Google TTS synthesis failed: {e}")
-                # Fallback to tone below
+            # Try specific voice first, then fall back to auto-select
+            voice_names_to_try = [self.voice_name, None]
+            
+            for v_name in voice_names_to_try:
+                try:
+                    print(f"DEBUG: Generating Google TTS for '{text[:20]}...' lang={self.language_code} voice={v_name or 'AUTO'}")
+                    s_input = texttospeech.SynthesisInput(text=text)
+                    v_params = texttospeech.VoiceSelectionParams(
+                        language_code=self.language_code,
+                        name=v_name
+                    )
+                    a_config = texttospeech.AudioConfig(
+                        audio_encoding=texttospeech.AudioEncoding.LINEAR16
+                    )
+                    
+                    response = client.synthesize_speech(
+                        input=s_input, voice=v_params, audio_config=a_config
+                    )
+                    
+                    sample_rate = 24000
+                    wav_bytes = _audio_to_wav_bytes(response.audio_content, sample_rate)
+                    
+                    print(f"DEBUG: Successfully generated {len(wav_bytes)} bytes of audio (v={v_name or 'AUTO'})")
+                    return wav_bytes, sample_rate
+                except Exception as e:
+                    print(f"DEBUG: Google TTS attempt failed (v={v_name or 'AUTO'}): {e}")
+                    # Continue to next attempt (None) or exit loop
+                    continue
         else:
             print("WARNING: Google TTS client not initialized (check credentials JSON)")
         
@@ -189,10 +192,8 @@ class GoogleTTSProvider(TextToSpeech):
 
 class NigerianEnglishTTSProvider(GoogleTTSProvider):
     def __init__(self) -> None:
-        # Using en-NG-Standard-A or en-US-Standard-A if NG is not available or desired.
-        # Google has en-NG-Wavenet-A (male), en-NG-Wavenet-B (female), en-NG-Wavenet-C (male)
         super().__init__(
-            voice_name="en-NG-Wavenet-A", 
+            voice_name="en-NG-Standard-A", 
             language_code="en-NG", 
             fallback_freq=440.0
         )
@@ -200,9 +201,6 @@ class NigerianEnglishTTSProvider(GoogleTTSProvider):
 
 class YorubaTTSProvider(GoogleTTSProvider):
     def __init__(self) -> None:
-        # Google does not have a native Yoruba voice in standard TTS yet? 
-        # Actually Google Cloud TTS added Yoruba (yo-NG) recently.
-        # Let's check or use a sensible default.
         super().__init__(
             voice_name="yo-NG-Standard-A", 
             language_code="yo-NG", 
