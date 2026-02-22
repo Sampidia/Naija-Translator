@@ -50,6 +50,39 @@
       width: 100%;
       margin-top: 0.5rem;
     }
+
+    .rec-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      align-items: end;
+    }
+
+    #recordBtn {
+      background: #d32f2f;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    #recordBtn.recording {
+      background: #b71c1c;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.6;
+      }
+    }
   </style>
 </head>
 
@@ -105,9 +138,22 @@
 
   <section class="card">
     <h2>3) Yoruba Speech → English + Audio</h2>
-    <label for="speechFile">Audio file</label>
+
+    <label>Option A: Record from microphone</label>
+    <div class="rec-row">
+      <div>
+        <button id="recordBtn">🎙 Start Recording</button>
+      </div>
+      <div>
+        <p class="muted" id="recordStatus">Not recording</p>
+      </div>
+    </div>
+    <audio id="recordedPreview" controls style="display:none;"></audio>
+
+    <label>Option B: Upload audio file</label>
     <input id="speechFile" type="file" accept="audio/*" />
-    <button id="speechBtn">Upload + Translate</button>
+
+    <button id="speechBtn">Translate Speech</button>
     <p class="muted" id="speechTextOut"></p>
     <p id="speechTtsStatus" class="muted"></p>
     <audio id="speechAudio" controls></audio>
@@ -189,18 +235,71 @@
       }
     };
 
+    // ---------- Microphone Recording ---------- //
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let recordedBlob = null;
+
+    document.getElementById('recordBtn').onclick = async () => {
+      const btn = document.getElementById('recordBtn');
+      const statusEl = document.getElementById('recordStatus');
+      const preview = document.getElementById('recordedPreview');
+
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        // Stop recording
+        mediaRecorder.stop();
+        btn.textContent = '🎙 Start Recording';
+        btn.classList.remove('recording');
+        statusEl.textContent = 'Processing...';
+        return;
+      }
+
+      // Start recording
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        recordedChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+          const url = URL.createObjectURL(recordedBlob);
+          preview.src = url;
+          preview.style.display = 'block';
+          statusEl.textContent = 'Recording saved! Click "Translate Speech" to process.';
+          // Stop all tracks to release microphone
+          stream.getTracks().forEach(t => t.stop());
+        };
+
+        mediaRecorder.start();
+        btn.textContent = '⏹ Stop Recording';
+        btn.classList.add('recording');
+        statusEl.textContent = 'Recording... Speak now!';
+      } catch (e) {
+        statusEl.textContent = `Microphone error: ${e.message}`;
+      }
+    };
+
+    // ---------- Speech Translate (record OR upload) ---------- //
     document.getElementById('speechBtn').onclick = async () => {
       const file = document.getElementById('speechFile').files[0];
       const out = document.getElementById('speechTextOut');
       const statusEl = document.getElementById('speechTtsStatus');
       const audioEl = document.getElementById('speechAudio');
-      if (!file) {
-        out.textContent = 'Please select an audio file.';
+
+      // Prefer file upload if selected, otherwise use recorded audio
+      let audioData = file || recordedBlob;
+      if (!audioData) {
+        out.textContent = 'Please record audio or select a file first.';
         return;
       }
-      out.textContent = 'Uploading...';
+
+      out.textContent = 'Uploading & translating...';
       const form = new FormData();
-      form.append('audio_file', file);
+      form.append('audio_file', audioData, audioData.name || 'recording.webm');
       try {
         const data = await fetchJson('/api/v1/speech/translate', { method: 'POST', body: form });
         out.textContent = `Transcript: ${data.transcript_yo} | EN: ${data.translated_text_en}`;
